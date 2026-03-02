@@ -1,4 +1,35 @@
 # client.py
+
+"""
+NoticeInfo
+---------------------------|
+Project: PyChat - Client core implementation 客户端核心
+Author: ChatGPT/Tencent Cloud CodeBuddy/Git32-Design
+Description:
+这是一个基于Python的多人在线聊天服务器，支持基本的账户注册、登录、两步验证和消息广播功能。以后会开发出基于GUI的“PyChat Launcher”，现以Batch语言实现server和client先后执行。
+Created: 2026-02-26
+Latest update: 2026-03-02
+License: MIT License
+Features:
+- 账户管理：注册、登录、两步验证（可选）、密码安全存储、账户恢复
+- 实时聊天：支持文本消息和表情符号，消息广播给所有在线用户
+- 玩家状态：每个玩家有位置、皮肤、表情状态等属性，服务器维护并同步这些状态
+- 服务器性能：使用多线程处理多个客户端连接，确保响应速度和稳定性
+- 数据安全：使用SQLite数据库存储账户信息，密码使用哈希和盐进行安全存储，防止泄露风险
+- 可扩展性：服务器设计为模块化，便于未来添加更多功能（如好友系统、私聊、游戏内活动等）
+- Host处理：服务器会自动选择一个可用的IP地址作为Host，并广播给所有客户端。以Client配置连接IP地址
+Main Designs:
+Git32-Design - 素材设计，使用Pixilart工具绘制
+TC Codebuddy - 代码设计，使用Tencent Cloud CodeBuddy工具编写
+Copilot(ChatGPT-5) - 代码实现，使用GitHub Copilot（基于ChatGPT-5）辅助编写与修复
+======
+OnlineInfo
+---------------------------|
+Access: 0 Users
+Stars: 0 Stars
+Commits: 99.09%
+"""
+
 import pygame
 import socket
 import threading
@@ -6,15 +37,16 @@ import pickle
 import os
 import sys
 import time
+from typing import Optional, Dict, Any, List
 
 # ----------------- 前置配置 ------------------
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ------------------- 配置 -------------------
-SERVER_HOST = '127.0.0.1'
+SERVER_HOST = '192.168.1.104'
 SERVER_PORT = 12345
 SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 850
+SCREEN_HEIGHT = 800
 FPS = 60
 PLAYER_SPEED = 5
 EMOTE_DURATION = 2.0
@@ -73,22 +105,152 @@ def render_mixed_text(text, font_en, font_cn, color=(255,255,255)):
     return result
 
 # ------------------- 玩家类 -------------------
+# Please extend player information to hex status code and more attributes in the future.
 class Player:
-    def __init__(self, pid, x, y, skin_id):
+    """玩家数据结构：
+    - 增强了状态字段（status_hex）和常见属性（health, score, ping 等）
+    - 提供 to_dict 和 update_from_dict 便于网络序列化/更新
+    """
+    def __init__(
+        self,
+        pid: int,
+        x: float,
+        y: float,
+        skin_id: int,
+        username: Optional[str] = None,
+        logged_in: bool = False,
+        status_hex: str = "0x0",
+        health: int = 100,
+        max_health: int = 100,
+        score: int = 0,
+        ping_ms: int = 0,
+        status_flags: Optional[Dict[str, bool]] = None,
+        inventory: Optional[List[Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        created_at: Optional[float] = None,
+        last_seen: Optional[float] = None,
+        is_admin: bool = False,
+    ):
         self.id = pid
         self.x = x
         self.y = y
         self.skin_id = skin_id
-        self.username = None
-        self.logged_in = False
+
+        # 认证/显示信息
+        self.username = username
+        self.logged_in = logged_in
+
+        # 状态（用于快速以十六进制或位掩码表示复合状态）
+        self.status_hex = status_hex
+
+        # 生存/分数/延迟等
+        self.health = health
+        self.max_health = max_health
+        self.score = score
+        self.ping_ms = ping_ms
+
+        # 可扩展的标志和物品/元数据
+        self.status_flags: Dict[str, bool] = status_flags or {}
+        self.inventory: List[Any] = inventory or []
+        self.metadata: Dict[str, Any] = metadata or {}
+
+        # 时间戳
+        self.created_at = created_at if created_at is not None else time.time()
+        self.last_seen = last_seen if last_seen is not None else time.time()
+
+        # 权限
+        self.is_admin = is_admin
+
+        # 表情相关（原有字段，保留）
         self.current_emote = None
         self.emote_timer = 0
 
-    def update_emote(self, dt):
+    def update_emote(self, dt: float):
         if self.current_emote is not None:
             self.emote_timer -= dt
             if self.emote_timer <= 0:
                 self.current_emote = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """将玩家数据导出为字典，便于网络传输或调试。"""
+        return {
+            'id': self.id,
+            'x': self.x,
+            'y': self.y,
+            'skin': self.skin_id,
+            'username': self.username,
+            'logged_in': self.logged_in,
+            'emote': self.current_emote,
+            'emote_timer': self.emote_timer,
+            'status_hex': self.status_hex,
+            'health': self.health,
+            'max_health': self.max_health,
+            'score': self.score,
+            'ping_ms': self.ping_ms,
+            'status_flags': self.status_flags,
+            'inventory': self.inventory,
+            'metadata': self.metadata,
+            'created_at': self.created_at,
+            'last_seen': self.last_seen,
+            'is_admin': self.is_admin,
+        }
+
+    def update_from_dict(self, pdata: Dict[str, Any]):
+        """从服务器/字典更新玩家字段：
+        - 接受服务器的命名（例如 'skin'）并进行映射到本地属性
+        - 只更新已知字段，其余保存在 metadata 中
+        """
+        # 基本位置/外观
+        if 'x' in pdata:
+            self.x = pdata['x']
+        if 'y' in pdata:
+            self.y = pdata['y']
+        if 'skin' in pdata:
+            self.skin_id = pdata['skin']
+
+        # 标识/登录
+        if 'username' in pdata:
+            self.username = pdata.get('username')
+        if 'logged_in' in pdata:
+            self.logged_in = pdata.get('logged_in', self.logged_in)
+
+        # 表情
+        if 'emote' in pdata:
+            self.current_emote = pdata.get('emote')
+        if 'emote_timer' in pdata:
+            self.emote_timer = pdata.get('emote_timer', self.emote_timer)
+
+        # 增强属性
+        if 'status_hex' in pdata:
+            self.status_hex = pdata['status_hex']
+        if 'health' in pdata:
+            self.health = pdata['health']
+        if 'max_health' in pdata:
+            self.max_health = pdata['max_health']
+        if 'score' in pdata:
+            self.score = pdata['score']
+        if 'ping_ms' in pdata:
+            self.ping_ms = pdata['ping_ms']
+        if 'status_flags' in pdata and isinstance(pdata['status_flags'], dict):
+            # 合并/覆盖标志
+            self.status_flags.update(pdata['status_flags'])
+        if 'inventory' in pdata and isinstance(pdata['inventory'], list):
+            self.inventory = pdata['inventory']
+        if 'metadata' in pdata and isinstance(pdata['metadata'], dict):
+            self.metadata.update(pdata['metadata'])
+        if 'is_admin' in pdata:
+            self.is_admin = pdata['is_admin']
+
+        # 更新时间戳（如果服务器提供）
+        if 'last_seen' in pdata:
+            self.last_seen = pdata['last_seen']
+
+    def set_status_flag(self, name: str, value: bool = True):
+        self.status_flags[name] = value
+
+    def clear_status_flag(self, name: str):
+        if name in self.status_flags:
+            del self.status_flags[name]
 
 # ------------------- 摄像机类 -------------------
 class Camera:
@@ -149,6 +311,23 @@ class ChatInput:
             elif event.key == pygame.K_BACKSPACE:
                 self.text = self.text[:-1]
                 print(f"[DEBUG] 退格，当前文本: '{self.text}'")
+            # Ctrl+C 复制
+            elif event.key == pygame.K_c and (event.mod & pygame.KMOD_CTRL):
+                pygame.scrap.init()
+                pygame.scrap.put(pygame.SCRAP_TEXT, self.text.encode('utf-8'))
+                print(f"[DEBUG] 已复制: '{self.text}'")
+            # Ctrl+V 粘贴
+            elif event.key == pygame.K_v and (event.mod & pygame.KMOD_CTRL):
+                try:
+                    import tkinter as tk
+                    root = tk.Tk()
+                    root.withdraw()
+                    clipboard = root.clipboard_get()
+                    root.destroy()
+                    self.text += clipboard
+                    print(f"[DEBUG] 已粘贴: '{clipboard}'")
+                except:
+                    print("[DEBUG] 粘贴失败")
             # 其他功能键忽略
         elif event.type == pygame.TEXTINPUT and self.active:
             self.text += event.text
@@ -297,11 +476,18 @@ class GameClient:
     def update_players_from_dict(self, players_dict):
         for pid, pdata in players_dict.items():
             if pid not in self.players:
-                self.players[pid] = Player(pid, pdata['x'], pdata['y'], pdata['skin'])
-            else:
-                self.players[pid].x = pdata['x']
-                self.players[pid].y = pdata['y']
-                self.players[pid].skin_id = pdata['skin']
+                # 只提供最小构造参数，随后统一更新以处理新字段
+                self.players[pid] = Player(pid, pdata.get('x', 0), pdata.get('y', 0), pdata.get('skin', 0))
+
+            # 使用统一方法从字典更新玩家属性（包括新加的字段）
+            try:
+                self.players[pid].update_from_dict(pdata)
+            except Exception as e:
+                # 出错时回退到逐个设置以保证兼容性
+                print(f"更新玩家 {pid} 时出错，回退并记录错误: {e}")
+                self.players[pid].x = pdata.get('x', self.players[pid].x)
+                self.players[pid].y = pdata.get('y', self.players[pid].y)
+                self.players[pid].skin_id = pdata.get('skin', self.players[pid].skin_id)
                 self.players[pid].username = pdata.get('username')
                 self.players[pid].logged_in = pdata.get('logged_in', False)
                 self.players[pid].current_emote = pdata.get('emote')
@@ -329,9 +515,22 @@ class GameClient:
             self.chat_history.add_message("系统", f"注册失败：{msg['message']}")
 
     def save_recovery_code(self, code):
-        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+        import ctypes
+        # 获取Windows系统真实的桌面路径
+        try:
+            from ctypes import wintypes
+            CSIDL_DESKTOP = 0
+            SHGFP_TYPE_CURRENT = 0
+            buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+            ctypes.windll.shell32.SHGetFolderPathW(0, CSIDL_DESKTOP, 0, SHGFP_TYPE_CURRENT, buf)
+            desktop = buf.value
+        except:
+            # 降级方案：使用环境变量
+            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+        
         if not os.path.exists(desktop):
             desktop = os.path.expanduser("~")
+        
         filename = f"2FA_Code_{int(time.time())}.txt"
         filepath = os.path.join(desktop, filename)
         with open(filepath, 'w') as f:
@@ -350,7 +549,7 @@ class GameClient:
         if text.startswith(".regist "):
             parts = text.split()
             if len(parts) < 3:
-                self.chat_history.add_message("系统", "格式错误：.regist <用户名> <密码> [true/false]")
+                self.chat_history.add_message("系统", "格式错误：.regist <用户名> <密码> [是否启用2FA:true/false]")
                 return True
             username = parts[1]
             password = parts[2]
@@ -377,7 +576,7 @@ class GameClient:
             self.chat_history.add_message("系统", "         .login <用户名> <密码> [恢复码] - 登录账号（如果启用2FA需要恢复码）")
             self.chat_history.add_message("系统", "         .help - 显示此帮助信息")
             self.chat_history.add_message("系统", "快捷键：F1跟随视角，F2全局视角，F3自由视角，1-3切换皮肤，B切换背景，F5-F9触发表情")
-            self.chat_history.add_message("系统", "此程序还未完善，画风简陋，功能有限，更多功能敬请期待！此程序适合电脑课与同学交流和互动，已发布Github以便同学下载，欢迎提出Issues以便完善！")
+            self.chat_history.add_message("系统", "此程序还未完善，画风简陋，功能有限，更多功能敬请期待！此程序适合电脑课与同学交流和互动，已发布Github以便同学下载，欢迎提出Issues以便完善！电脑课不建议启用2FA状态码qwq")
             return True
         return False
 
@@ -484,10 +683,29 @@ class GameClient:
                 screen_y = player.y - self.camera.offset_y
                 skin_img = self.skins[player.skin_id]
                 self.screen.blit(skin_img, (screen_x, screen_y))
+                
                 if player.username:
-                    font = pygame.font.Font(None, 20)
-                    name_surf = font.render(player.username, True, (255, 255, 0))
-                    self.screen.blit(name_surf, (screen_x, screen_y - 20))
+                    # 区分本地玩家和其他玩家的名字
+                    is_local_player = (player.id == self.local_player_id)
+                    font_size = 28 if is_local_player else 24
+                    font = pygame.font.Font(None, font_size)
+                    
+                    # 本地玩家使用特殊颜色（亮粉色），其他玩家使用黄色
+                    name_color = (255, 105, 180) if is_local_player else (255, 255, 0)
+                    name_surf = font.render(player.username, True, name_color)
+                    
+                    # 计算居中位置
+                    name_x = screen_x + 16 - name_surf.get_width() // 2
+                    name_y = screen_y - 30 if player.current_emote is None else screen_y - 55
+                    
+                    # 简化描边：只绘制4个方向的黑色描边（减少渲染次数）
+                    outline_color = (0, 0, 0)
+                    for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        outline_surf = font.render(player.username, True, outline_color)
+                        self.screen.blit(outline_surf, (name_x + ox, name_y + oy))
+                    
+                    # 绘制名字
+                    self.screen.blit(name_surf, (name_x, name_y))
                 if player.current_emote is not None:
                     emote_img = self.emotes[player.current_emote]
                     emote_rect = emote_img.get_rect(center=(screen_x + 16, screen_y - 40))

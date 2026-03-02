@@ -1,4 +1,35 @@
 # server.py
+
+"""
+NoticeInfo
+---------------------------|
+Project: PyChat - Server core implementation 服务端核心
+Author: ChatGPT/Tencent Cloud CodeBuddy/Git32-Design
+Description:
+这是一个基于Python的多人在线聊天服务器，支持基本的账户注册、登录、两步验证和消息广播功能。以后会开发出基于GUI的“PyChat Launcher”，现以Batch语言实现server和client先后执行。
+Created: 2026-02-26
+Latest update: 2026-03-02
+License: MIT License
+Features:
+- 账户管理：注册、登录、两步验证（可选）、密码安全存储、账户恢复
+- 实时聊天：支持文本消息和表情符号，消息广播给所有在线用户
+- 玩家状态：每个玩家有位置、皮肤、表情状态等属性，服务器维护并同步这些状态
+- 服务器性能：使用多线程处理多个客户端连接，确保响应速度和稳定性
+- 数据安全：使用SQLite数据库存储账户信息，密码使用哈希和盐进行安全存储，防止泄露风险
+- 可扩展性：服务器设计为模块化，便于未来添加更多功能（如好友系统、私聊、游戏内活动等）
+- Host处理：服务器会自动选择一个可用的IP地址作为Host，并广播给所有客户端。以Client配置连接IP地址
+Main Designs:
+Git32-Design - 素材设计，使用Pixilart工具绘制
+TC Codebuddy - 代码设计，使用Tencent Cloud CodeBuddy工具编写
+Copilot(ChatGPT-5) - 代码实现，使用GitHub Copilot（基于ChatGPT-5）辅助编写与修复
+======
+OnlineInfo
+---------------------------|
+Access: 0 Users
+Stars: 0 Stars
+Commits: 99.09%
+"""
+
 import socket
 import threading
 import pickle
