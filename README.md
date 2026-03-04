@@ -105,9 +105,9 @@ python client.py
 
 ```
 PyChat - Project #003/
-├── server.py              # 服务器核心
+├── server.py              # 服务器核心，已隐藏，为不可修改文件，client.py的核心
 ├── client.py              # 客户端核心
-├── Start.bat              # 启动脚本
+├── Start.bat              # 启动脚本，已删除，只剩一个py脚本无需使用快捷启动脚本
 ├── accounts.db            # 账号数据库
 ├── backgrounds/           # 背景素材
 ├── emotes/              # 表情素材
@@ -132,7 +132,7 @@ PyChat - Project #003/
 - 账户注册与登录
 - 两步验证支持
 
-### 预计：v3.2.1 Production
+### 预计：v3.2.1 Production/Unstable
 - 扩展市场功能
 - PyChat Launcher 启动器
 - PyGame Launcher 集成
@@ -162,7 +162,7 @@ PyChat - Project #003/
 - [ ] PyChat Launcher 图形界面
 - [ ] 扩展市场 (PCE Marketplace)
 - [ ] 开发者工具
-- [ ] PyGame Launcher 集成
+- [x] PyGame Launcher 集成
 - [ ] 好友系统
 - [ ] 私聊功能
 - [ ] 游戏内活动

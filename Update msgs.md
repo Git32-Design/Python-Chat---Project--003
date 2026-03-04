@@ -98,8 +98,15 @@ Stars: 0 Stars
 Commits: 99.09%
 """
 ```
+# v2.1.2 Beta - Deleted developer programs, protect against tampering
 
-# 预计: Release 1|v3.2.1 Production/Unstable - Add extension marketplace and PyChat launcher
+## 删除
+
+1. 删除`server.py`，因为只需`client.py`连接的主机需要server.py，更重要的是防止`server.py`这样的核心程序被修改
+
+2. 删除了`start.bat`，因为引用了无效的脚本，现在只需运行client就行了
+
+# 预计: Release 1|v3.2.3 Production/Unstable - Add extension marketplace and PyChat launcher
 
 ## 扩展市场
 
