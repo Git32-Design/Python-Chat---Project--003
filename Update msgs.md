@@ -59,7 +59,7 @@
 
 4. `score` - 分数
 
-...
+- 还有其他
 
 ## 头部文档
 
@@ -99,7 +99,7 @@ Commits: 99.09%
 """
 ```
 
-# 预计: Release 1|v3.2.1 Production - Add extension marketplace and PyChat launcher
+# 预计: Release 1|v3.2.1 Production/Unstable - Add extension marketplace and PyChat launcher
 
 ## 扩展市场
 
