@@ -106,7 +106,15 @@ Commits: 99.09%
 
 2. 删除了`start.bat`，因为引用了无效的脚本，现在只需运行client就行了
 
-# 预计: Release 1|v3.2.3 Production/Unstable - Add extension marketplace and PyChat launcher
+# v2.2.2 Beta - Include `config.ini`, startup using `python client.py <IP>`
+
+## 配置文件
+
+1. 添加`config.ini`配置文件以启动时配置IP
+
+2. 启动命令可自定义连接的IP，像这样`python client.py 127.0.0.1`
+
+# 预计: Release 1|v3.3.3 Production/Unstable - Add extension marketplace and PyChat launcher
 
 ## 扩展市场
 

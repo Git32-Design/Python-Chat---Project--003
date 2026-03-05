@@ -43,8 +43,20 @@ from typing import Optional, Dict, Any, List
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ------------------- 配置 -------------------
-SERVER_HOST = '192.168.1.104'
+# 默认配置(可被命令行参数覆盖)
+DEFAULT_SERVER_HOST = '127.0.0.1'  # 默认本地测试
 SERVER_PORT = 12345
+
+# 从命令行读取服务器地址(如果提供)
+import sys
+if len(sys.argv) > 1:
+    SERVER_HOST = sys.argv[1]
+else:
+    SERVER_HOST = DEFAULT_SERVER_HOST
+    print(f"使用默认服务器: {SERVER_HOST}")
+    print("使用方法: python client.py <服务器IP地址>")
+    print(f"示例: python client.py 192.168.1.101")
+
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 800
 FPS = 60
